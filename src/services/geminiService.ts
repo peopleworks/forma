@@ -1266,7 +1266,7 @@ export async function analyzeReportDesign(
   prompt: string,
   imageParts: AttachmentPart[],
   config?: ReportConfig,
-  previousState?: { layout?: ReportLayout; repxContent?: string },
+  previousState?: { layout?: ReportLayout; repxContent?: string; houseStyle?: string },
   signal?: AbortSignal,
   onProgress?: (progress: StreamProgress) => void
 ): Promise<AnalysisResponse> {
@@ -1411,6 +1411,23 @@ export async function analyzeReportDesign(
   Make sure the generated REPX XML strictly adhering to these settings.
   ` : '';
 
+  /**
+   * Retrieved house-style fragments, already assembled into a block.
+   *
+   * **Handed in rather than fetched here, deliberately.** Retrieval reads an
+   * IndexedDB library and makes an embedding request, and this function is the
+   * prompt builder — giving it IO would make every generation depend on a store
+   * that only matters on a refine. `lib/houseStyle.ts` builds the block and the
+   * caller passes it, so the whole feature stays absent from the first-pass path
+   * where it has nothing to offer anyway (see that file for why retrieval cannot
+   * run before the model has looked).
+   *
+   * Empty when the caller retrieved nothing, and empty is the normal case: no
+   * library, no sign-in, or nothing scoring above the threshold. It appends
+   * nothing then, rather than telling the model there is no house style.
+   */
+  const houseStyleContext = previousState?.houseStyle?.trim() ?? '';
+
   const previousContext = previousState ? `
   PREVIOUS REPORT STATE:
   You are modifying an existing report. Here is the current layout structure:
@@ -1420,6 +1437,7 @@ export async function analyzeReportDesign(
   ${previousState.repxContent}
   
   CRITICAL: You MUST preserve the entire existing structure from the PREVIOUS REPORT STATE. Only modify the specific parts requested in the USER INSTRUCTIONS. Do NOT remove sections, tables, or fields unless explicitly told to do so.
+${houseStyleContext}
   ` : '';
 
   // config.modelName is an internal escape hatch with no UI — a self-hoster can

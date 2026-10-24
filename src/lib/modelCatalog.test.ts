@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { usableFromCatalog, rankDiscovered, mergeCandidates, type CatalogEntry } from './modelCatalog';
+import {
+  usableFromCatalog,
+  embeddingFromCatalog,
+  rankDiscovered,
+  mergeCandidates,
+  type CatalogEntry,
+} from './modelCatalog';
 
 /**
  * Both halves of this file fail *plausibly*. A filter that lets the wrong
@@ -121,5 +127,66 @@ describe('mergeCandidates', () => {
   it('returns the curated list unchanged when discovery found nothing', () => {
     // The offline / blocked-endpoint path: no catalogue must never mean no models.
     expect(mergeCandidates(CURATED, [])).toEqual(CURATED);
+  });
+});
+
+/**
+ * The mirror of `usableFromCatalog`, and the stakes are higher rather than lower:
+ * a wrongly admitted generation model costs one probe, while a wrongly admitted
+ * embedding model produces a whole stored library of vectors in a space nothing
+ * else can be compared against.
+ */
+describe('embeddingFromCatalog', () => {
+  it('takes models that declare embedContent', () => {
+    const entries = [
+      entry('text-embedding-x', ['embedContent']),
+      entry('gemini-embedding-001', ['embedContent']),
+    ];
+    expect(embeddingFromCatalog(entries)).toEqual(['text-embedding-x', 'gemini-embedding-001']);
+  });
+
+  it('leaves generation models alone, which is what stops a library of the wrong vectors', () => {
+    const entries = [
+      entry('gemini-2.5-flash', ['generateContent']),
+      entry('gemini-2.5-pro', ['generateContent', 'countTokens']),
+    ];
+    expect(embeddingFromCatalog(entries)).toEqual([]);
+  });
+
+  it('does not require a gemini- prefix, because the family is not named that way', () => {
+    // usableFromCatalog requires it; applying that here would reject text-embedding-*.
+    expect(embeddingFromCatalog([entry('text-embedding-004', ['embedContent'])])).toEqual(['text-embedding-004']);
+  });
+
+  it('still requires the name to look like an embedding model', () => {
+    // supportedGenerationMethods is the authority, but an entry claiming
+    // embedContent while named for something else is the wrongly-admitted case.
+    expect(embeddingFromCatalog([entry('imagen-3.0', ['embedContent'])])).toEqual([]);
+  });
+
+  it('skips preview, experimental and dated variants like its sibling does', () => {
+    for (const name of ['text-embedding-exp', 'gemini-embedding-preview', 'text-embedding-2024']) {
+      expect(embeddingFromCatalog([entry(name, ['embedContent'])]), name).toEqual([]);
+    }
+  });
+
+  it('gives no benefit of the doubt to an entry that declares nothing', () => {
+    const entries: CatalogEntry[] = [
+      { name: 'models/text-embedding-x' },
+      { name: 'models/text-embedding-y', supportedGenerationMethods: [] },
+      { supportedGenerationMethods: ['embedContent'] },
+    ];
+    expect(embeddingFromCatalog(entries)).toEqual([]);
+  });
+
+  it('answers empty for a catalogue it cannot read, rather than throwing', () => {
+    for (const bad of [undefined, null, 'models', 42]) {
+      expect(embeddingFromCatalog(bad as never), JSON.stringify(bad)).toEqual([]);
+    }
+  });
+
+  it('returns each name once', () => {
+    const twice = [entry('text-embedding-x', ['embedContent']), entry('text-embedding-x', ['embedContent'])];
+    expect(embeddingFromCatalog(twice)).toEqual(['text-embedding-x']);
   });
 });

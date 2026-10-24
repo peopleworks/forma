@@ -19,7 +19,7 @@ you add a test, this is the file to update, and it should stay the only one.
 
 ## There are two test suites, and between them they still cover little
 
-`npm test` runs Vitest over **1,323 tests in 60 files** — under the `node` environment
+`npm test` runs Vitest over **1,469 tests in 68 files** — under the `node` environment
 by default, with the eleven files that genuinely need a DOM opting into jsdom on their
 own first line; see `vitest.config.ts` for why that split is load-bearing rather than
 tidiness, and `CLAUDE.md` for the cold-cache cliff that makes those eleven fail in a way
@@ -81,6 +81,7 @@ Paths are relative to `src/`. Verified against `npx vitest run --reporter=json` 
 | `components/ChatThread` | 27 | jsdom |
 | `components/Composer` | 33 | jsdom, 8 from one loop |
 | `components/DataBinding` | 15 | jsdom |
+| `components/LibraryPanel` | 17 | jsdom |
 | `components/legalDisclosure` | 9 | 3 from one loop |
 | `lib/analysisResponse` | 16 | 4 from two `it(` sharing one loop |
 | `lib/announcements` | 7 |  |
@@ -93,12 +94,15 @@ Paths are relative to `src/`. Verified against `npx vitest run --reporter=json` 
 | `lib/dataSource` | 29 |  |
 | `lib/datetime` | 12 |  |
 | `lib/designerBridge` | 38 | 8 from one loop |
+| `lib/embedStore` | 20 |  |
 | `lib/geminiClient` | 6 |  |
 | `lib/geminiErrors` | 25 |  |
 | `lib/generationProgress` | 22 |  |
+| `lib/houseStyle` | 18 |  |
+| `lib/libraryDb` | 12 | record mapping only; no IndexedDB in jsdom |
 | `lib/mockupRows` | 12 |  |
 | `lib/modelCache` | 17 |  |
-| `lib/modelCatalog` | 16 |  |
+| `lib/modelCatalog` | 24 |  |
 | `lib/panelSize` | 13 |  |
 | `lib/pdf` | 5 |  |
 | `lib/promptSections` | 48 |  |
@@ -110,6 +114,7 @@ Paths are relative to `src/`. Verified against `npx vitest run --reporter=json` 
 | `lib/repxAudit` | 81 |  |
 | `lib/repxBindingPlan` | 63 |  |
 | `lib/repxBindings` | 33 |  |
+| `lib/repxChunks` | 22 |  |
 | `lib/repxEdit` | 24 |  |
 | `lib/repxItems` | 12 |  |
 | `lib/repxMargins` | 24 |  |
@@ -126,6 +131,7 @@ Paths are relative to `src/`. Verified against `npx vitest run --reporter=json` 
 | `lib/themeTransition` | 15 | jsdom |
 | `lib/tokenUsage` | 15 |  |
 | `lib/userInstructions` | 9 |  |
+| `lib/vectorSearch` | 14 |  |
 | `lib/workspaceView` | 11 |  |
 | `lib/zip` | 24 |  |
 | `server/bindHost` | 6 |  |
@@ -133,11 +139,13 @@ Paths are relative to `src/`. Verified against `npx vitest run --reporter=json` 
 | `server/securityHeaders` | 27 |  |
 | `server/staticCache` | 10 |  |
 | `services/chatRetry` | 10 |  |
+| `services/embeddings` | 20 | SDK mocked, as `geminiService` is |
 | `services/geminiService` | 33 | 7 of these come from one loop |
 | `services/keyVault` | 21 | jsdom |
+| `services/library` | 15 | storage and embedding injected |
 | `services/modelResolution` | 32 | jsdom |
 
-**Total: 1,323 in 60 files** — and that total is the arithmetic sum of the column above
+**Total: 1,469 in 68 files** — and that total is the arithmetic sum of the column above
 it, which is the point of writing both down. A mismatch between them is the cheapest
 possible signal that this table went stale, so adding a case changes **two** numbers
 here, not one.

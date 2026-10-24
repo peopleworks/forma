@@ -1764,3 +1764,21 @@ select.wb-ctl { appearance: none; cursor: pointer; padding-right: 34px; }
   .wb-root .wb-card .wb-row-actions { transition: opacity .15s ease !important; }
   .wb-root .wb-card.wb-leaving { transition: opacity .18s ease !important; }
 }
+
+
+/* ------------------------------------------------------------ report library
+   The rail's sixth panel (docs/proposals/rag.md). Only what the markup cannot
+   do on its own: BatchPanel's bp- classes carry no rules and its rows are plain
+   stacked spans, which reads acceptably for one line per file and does not here
+   -- a name, a count and a button on one row run together without these. */
+.lp-panel { display: flex; flex-direction: column; gap: 10px; width: 100%; min-width: 0; }
+.lp-intro, .lp-hint, .lp-empty, .lp-summary { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.5; }
+.lp-hint, .lp-summary { color: var(--ink-faint); }
+.lp-notice { margin: 0; color: var(--ok-ink); font-size: 12.5px; }
+.lp-error { margin: 0; color: var(--bad-ink); font-size: 12.5px; line-height: 1.5; }
+.lp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lp-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lp-canonical { display: flex; align-items: center; flex: none; }
+.lp-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.lp-count { flex: none; color: var(--ink-faint); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+.lp-row .wb-pill { flex: none; }

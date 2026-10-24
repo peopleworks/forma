@@ -91,6 +91,55 @@ export function usableFromCatalog(entries: ReadonlyArray<CatalogEntry> | undefin
   return out;
 }
 
+/**
+ * Model ids from the same catalogue response that can produce an **embedding**.
+ *
+ * The mirror image of `usableFromCatalog`, and it exists for the same reason that
+ * function does: a hardcoded model id goes stale silently. `NOT_A_REPORT_MODEL`
+ * above already knows embedding models are a different family — this asks the
+ * catalogue which of them the key can actually call rather than naming one.
+ *
+ * Three differences from the generation selector, each forced by how these models
+ * are named:
+ *
+ * - The method is `embedContent`, not `generateContent`.
+ * - **No `gemini-` prefix requirement.** The embedding line is named
+ *   `text-embedding-*` as well as `gemini-embedding-*`, so that filter would
+ *   reject most of the family.
+ * - The name must actually look like an embedding model. `supportedGenerationMethods`
+ *   is the authority, but an entry that claims `embedContent` while being named
+ *   for something else is exactly the "wrongly admitted" case the sibling function
+ *   warns about, and here it would poison a whole stored library rather than cost
+ *   one probe.
+ *
+ * Order is left as the catalogue gave it. There is no cost tier to rank by and no
+ * way to tell quality apart without measuring retrieval, so the first workable
+ * answer is as good as any — and `embedStore` records which model produced each
+ * vector, so changing the answer later is a re-embed rather than a corruption.
+ */
+export function embeddingFromCatalog(entries: ReadonlyArray<CatalogEntry> | undefined): string[] {
+  if (!Array.isArray(entries)) return [];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry || typeof entry.name !== 'string') continue;
+    if (!Array.isArray(entry.supportedGenerationMethods)) continue;
+    if (!entry.supportedGenerationMethods.includes('embedContent')) continue;
+
+    const name = bareName(entry.name);
+    if (!/embedding|embed/i.test(name)) continue;
+    if (UNSTABLE.test(name)) continue;
+    if (seen.has(name)) continue;
+
+    seen.add(name);
+    out.push(name);
+  }
+
+  return out;
+}
+
 /** flash < flash-lite < pro. Cost order, because the user pays for their own key. */
 function tierOf(name: string): number {
   if (/lite/.test(name)) return 1;

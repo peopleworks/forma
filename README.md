@@ -397,6 +397,29 @@ src/
                        they describe the same columns, and binds the detail row
                        to one field each — declining rather than guess when the
                        two rows do not correspond),
+                       repxChunks (splits a report into the bands and controls
+                       an example is made of, replacing every value with a
+                       placeholder on the way — a model shown an example copies
+                       it, and a kept Ref makes the loader discard content),
+                       embedStore (what the report library holds, what still
+                       needs embedding, and what is safe to search — identity is
+                       the content, so re-importing a file costs no quota and an
+                       edited fragment never keeps the old text's vector),
+                       vectorSearch (cosine similarity and top-k over a few
+                       hundred vectors, by brute force: at this size an index
+                       costs more bundle and CSP than the scan it replaces),
+                       libraryDb (the library in IndexedDB — chosen over
+                       localStorage because this app has already exhausted that
+                       quota once, and because IndexedDB stores a Float32Array
+                       natively at 4 bytes a dimension instead of ~13 characters
+                       as JSON),
+                       houseStyle (what a retrieval turns into: the queries a
+                       draft asks, and the fenced block of examples appended to a
+                       refine — formatting to copy, values never, and nothing
+                       inside treated as an instruction. These five back the
+                       report library in docs/proposals/rag.md, alongside
+                       services/library.ts and components/LibraryPanel.tsx; the
+                       rail wiring in App.tsx is the one piece still to come),
                        attachments, panelSize, announcements, datetime,
                        modelCatalog, reportConfigStore, designerBridge,
                        geminiClient (loads the generation service on demand, so

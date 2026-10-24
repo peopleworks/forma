@@ -39,6 +39,7 @@ import {
   IconSearch,
   IconShieldCheck,
   IconSun,
+  IconDoc,
   IconImage,
   IconLayout,
   IconLogin,
@@ -138,6 +139,10 @@ const DataBinding = lazy(() => import('./components/DataBinding'));
 const BatchPanel = lazy(() => import('./components/BatchPanel'));
 /* Revision history. Lazy like the other three panels; it carries the diff. */
 const RevisionsPanel = lazy(() => import('./components/RevisionsPanel'));
+/* The report library. Lazy for the same reason as its neighbours: a visitor who
+   never opens the panel should not download it, and it pulls in the chunker,
+   the store and the search behind it. */
+const LibraryPanel = lazy(() => import('./components/LibraryPanel'));
 import { useFocusTrap } from './components/useFocusTrap';
 import LandingPage from './components/LandingPage';
 /* Lazy as of 2026-09-05, measured: these five were 105 kB of a 597 kB entry
@@ -169,6 +174,16 @@ import { titleForRoute, viewForRoute } from './lib/routes';
 import { plateFor, stateForPlate, type Plate, type ActiveTab, type SpecView } from './lib/workspaceView';
 import { countStagedUploads, admitFiles } from './lib/attachmentBudget';
 import { pushRevision, type Revision } from './lib/revisions';
+/* The report library: filling it, using it, and listing what it holds.
+   docs/proposals/rag.md carries the reasoning; this file only wires it up.
+
+   Loaded on demand, for the reason lib/geminiClient.ts spells out: importing it
+   here put the chunker, the store, the search and the embedding client into the
+   ENTRY chunk, which every visitor to the landing page downloads. Measured at
+   +17,318 B (82.2% -> 84.9% of that artifact's budget) before this was made
+   dynamic. The types are a separate `import type`, which is erased entirely. */
+const loadLibrary = () => import('./services/library');
+import type { LibraryDeps, LibrarySource } from './services/library';
 /* Persisting those revisions. Pure — it plans documents, it does not write them —
    so it stays eager while `accountData`'s path builders arrive through
    `loadFirebase()` with the SDK they import. */
@@ -1286,7 +1301,7 @@ export interface SavedReport {
    `routes.test.ts` now checks rather than asks you to remember. */
 
 /** Which panel the rail's second column is showing. */
-type RailPanel = 'review' | 'projects' | 'batch' | 'revisions';
+type RailPanel = 'review' | 'projects' | 'batch' | 'revisions' | 'library';
 
 /**
  * The review column's own geometry, remembered between sessions.
@@ -1299,6 +1314,9 @@ type RailPanel = 'review' | 'projects' | 'batch' | 'revisions';
 const REVIEW_WIDTH_KEY = 'reviewWidth';
 const REVIEW_COLLAPSED_KEY = 'reviewCollapsed';
 const RAIL_EXPANDED_KEY = 'railExpanded';
+/* Which library files are house style. Names only -- the library itself is in
+   IndexedDB, and this is a handful of strings. */
+const CANONICAL_KEY = 'libraryCanonical';
 
 /**
  * Bump when a stored width stops meaning what it meant, and a browser carrying
@@ -2373,6 +2391,111 @@ export default function App() {
    * somebody actually wants to return to under forty nudges. See lib/revisions.
    */
   const [revisions, setRevisions] = useState<Revision[]>([]);
+
+  /* ---------------------------------------------------------- report library */
+  /**
+   * The user's own reports, as house style. See docs/proposals/rag.md.
+   *
+   * Three pieces of state and no more: what the library holds (by file, not by
+   * fragment), which files count as house style, and the dependency bundle that
+   * owns the IndexedDB store. The work is all in services/library.ts -- this is
+   * the part React needs to re-render.
+   */
+  const [librarySources, setLibrarySources] = useState<LibrarySource[]>([]);
+  /**
+   * Which files may be retrieved from. Off by default, and persisted here
+   * because it is a handful of names rather than a store.
+   *
+   * The corpus is the argument for the default: a folder of real reports holds
+   * drafts and variants, and an import path that made everything canonical
+   * would show the model a draft as an example of how this place writes
+   * reports.
+   */
+  const [canonicalSources, setCanonicalSources] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(CANONICAL_KEY);
+      return new Set<string>(saved ? (JSON.parse(saved) as string[]) : []);
+    } catch {
+      return new Set<string>();
+    }
+  });
+  /* One bundle for the session. Creating it per call would open IndexedDB each time. */
+  const libraryDeps = useRef<LibraryDeps | null>(null);
+  const getLibraryDeps = useCallback(async (): Promise<LibraryDeps> => {
+    if (!libraryDeps.current) libraryDeps.current = (await loadLibrary()).defaultDeps();
+    return libraryDeps.current;
+  }, []);
+
+  const refreshLibrary = useCallback(async () => {
+    try {
+      const [{ sources }, deps] = await Promise.all([loadLibrary(), getLibraryDeps()]);
+      setLibrarySources(sources(await deps.storage.load()));
+    } catch {
+      /* A library that cannot be read is a feature offering nothing, not a
+         broken workspace -- the same rule libraryDb.load() follows. */
+      setLibrarySources([]);
+    }
+  }, [getLibraryDeps]);
+
+  useEffect(() => {
+    void refreshLibrary();
+  }, [refreshLibrary]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CANONICAL_KEY, JSON.stringify([...canonicalSources]));
+    } catch {
+      /* Quota, private mode. The ticks are a convenience, not the library. */
+    }
+  }, [canonicalSources]);
+
+  const handleLibraryImport = useCallback(
+    async (files: File[]) => {
+      const read = await Promise.all(
+        files.map(async (file) => ({ name: file.name, text: await file.text() })),
+      );
+      const { importReports } = await loadLibrary();
+      try {
+        return await importReports(read, await getLibraryDeps(), {
+          apiKey: config.customApiKey?.trim() ?? '',
+        });
+      } finally {
+        /* In a `finally`, because the chunks are written BEFORE the embedding
+           request and the request is the part that fails. Refreshing only on
+           success left the panel saying "Nothing here yet" over a store holding
+           31 fragments -- observed on 2026-09-24 importing Invoice.repx with a
+           key that could not embed. The list must show what is stored, not what
+           the last call returned. */
+        await refreshLibrary();
+      }
+    },
+    [config.customApiKey, getLibraryDeps, refreshLibrary],
+  );
+
+  const handleLibraryRemove = useCallback(
+    (name: string) => {
+      void (async () => {
+        const { removeSource } = await loadLibrary();
+        await removeSource(name, await getLibraryDeps());
+        setCanonicalSources((previous) => {
+          const next = new Set(previous);
+          next.delete(name);
+          return next;
+        });
+        await refreshLibrary();
+      })();
+    },
+    [getLibraryDeps, refreshLibrary],
+  );
+
+  const handleToggleCanonical = useCallback((name: string, canonical: boolean) => {
+    setCanonicalSources((previous) => {
+      const next = new Set(previous);
+      if (canonical) next.add(name);
+      else next.delete(name);
+      return next;
+    });
+  }, []);
   /**
    * Which saved project the bench is currently showing, or null for unsaved work.
    *
@@ -2934,6 +3057,39 @@ export default function App() {
 
       console.debug(copy.request);
       const { analyzeReportDesign } = await loadGemini();
+
+      /**
+       * House style, retrieved only on a refinement and only from files the
+       * user has ticked.
+       *
+       * `result` being present is what makes this a refinement: the draft is
+       * the query, which is the whole reason retrieval waits for the second
+       * pass rather than running on the screenshot (see lib/houseStyle.ts).
+       *
+       * Failure is swallowed to a warning on purpose. This is an enhancement to
+       * a request that works perfectly well without it, and an empty library, a
+       * blocked IndexedDB or a refused embedding must not cost the user the
+       * generation they actually asked for.
+       */
+      let houseStyle = '';
+      if (result?.repxContent && canonicalSources.size > 0) {
+        try {
+          const { retrieveHouseStyle } = await loadLibrary();
+          houseStyle = await retrieveHouseStyle(
+            result.repxContent,
+            currentPrompt,
+            await getLibraryDeps(),
+            {
+              apiKey: config.customApiKey?.trim() ?? '',
+              signal,
+              where: (entry) => canonicalSources.has(entry.chunk.source),
+            },
+          );
+        } catch (error) {
+          console.warn('House style could not be retrieved; generating without it.', error);
+        }
+      }
+
       const response = await analyzeReportDesign(
         // Passed through empty when the user typed nothing. It used to become
         // "Generate a professional DevExpress report layout based on these
@@ -2942,7 +3098,7 @@ export default function App() {
         currentPrompt,
         attachmentParts,
         config,
-        result ? { layout: result.layout, repxContent: result.repxContent } : undefined,
+        result ? { layout: result.layout, repxContent: result.repxContent, houseStyle } : undefined,
         signal,
         handleStreamProgress
       );
@@ -3720,6 +3876,7 @@ export default function App() {
         {railBtn('projects', 'Saved projects', <IconFolder size={19} />)}
         {railBtn('revisions', 'Revisions', <IconRedo size={19} />)}
         {railBtn('batch', 'Batch', <IconStack size={19} />)}
+        {railBtn('library', 'Report library', <IconDoc size={19} />)}
         <button data-open-config title="Configure" aria-label="Configure" onClick={() => setIsConfigOpen(true)}>
           <IconTune size={19} />
           <span className="wb-rail-label">Configure</span>
@@ -4108,6 +4265,30 @@ export default function App() {
                   setMessages([]);
                   showRailPanel('review');
                 }}
+              />
+            </Suspense>
+          </div>
+        </div>
+
+        <div className={`wb-panel-body${railPanel === 'library' ? '' : ' wb-hidden'}`}>
+          <div className="wb-col-head">
+            <h2 className="wb-col-title">Report library</h2>
+            {canonicalSources.size > 0 && (
+              <span className="wb-kicker">
+                {canonicalSources.size === 1 ? '1 in use' : `${canonicalSources.size} in use`}
+              </span>
+            )}
+          </div>
+          <div style={{ padding: '0 16px 16px', flex: 1, minHeight: 0, display: 'flex' }}>
+            <Suspense fallback={null}>
+              <LibraryPanel
+                sources={librarySources}
+                canonical={canonicalSources}
+                onImport={handleLibraryImport}
+                onRemove={handleLibraryRemove}
+                onToggleCanonical={handleToggleCanonical}
+                ready={hasApiKey}
+                onNeedKey={() => setIsConfigOpen(true)}
               />
             </Suspense>
           </div>
