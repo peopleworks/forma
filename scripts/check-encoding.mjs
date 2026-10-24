@@ -104,6 +104,18 @@ const ROOT_FILES = [
   // the kind of claim this list exists to stop anyone taking on trust.
   'firebase.json',
   '.firebaserc',
+  // Added 2026-09-21 with the file itself, rather than after it fell through.
+  // The FIFTH root file this list would have missed -- and the extension filter
+  // could never reach it, since it has no extension at all, exactly like the
+  // .gitignore two entries above.
+  //
+  // It is a pattern file, which is the case the control-character check exists
+  // for: a raw control character inside `*.woff2` does not throw, it just stops
+  // the rule matching, and the fonts start round-tripping through line-ending
+  // conversion with nothing reporting it. Its comment block is prose in the
+  // house style and one em dash away from being mojibake-able, which is the
+  // other half of why it belongs here.
+  '.gitattributes',
 ];
 
 /**

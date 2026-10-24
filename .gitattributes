@@ -1,0 +1,27 @@
+# Line endings are normalised to LF in the repository and on checkout.
+#
+# Without this file, a clone on a machine with `core.autocrlf=true` -- which is
+# git's default on Windows installs -- rewrites every tracked text file to CRLF
+# on the way out, while `git status` stays clean because the stored blobs are
+# still LF. That silently breaks anything that hashes a tracked file byte for
+# byte. It happened on 2026-09-21: `src/server/securityHeaders.test.ts`
+# recomputes the SHA-256 of index.html's inline theme script and compares it to
+# THEME_SCRIPT_HASH in `src/server/securityHeaders.ts`, and CRLF changed the
+# digest. One test failed -- but the real damage was in the build, where
+# `dist/index.html` no longer matched the CSP the server sends, so the theme
+# script would have been blocked in production and the flash of light theme it
+# exists to prevent would have come back, throwing nothing. CI never sees this:
+# `.github/workflows/checks.yml` runs on Linux, where autocrlf is off.
+#
+# `eol=lf` is deliberate rather than `text=auto` alone: auto-detection decides
+# what is text, but the working-tree ending still follows the local config, so
+# only an explicit eol pins it on every machine.
+* text=auto eol=lf
+
+# Binary files git must never inspect or convert.
+*.png  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.pdf  binary
+*.repx binary
