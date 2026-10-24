@@ -93,6 +93,27 @@ loaded   : 3 tables, 9 cells, 4 bindings
            nothing lost: every declared cell survived the load.
 ```
 
+**It walked only the top level until 2026-09-23, and reported a false CONTENT
+LOST.** `Inspect` iterated `r.Bands` and each band's own `Controls` and stopped
+there, so anything inside a `SubBand`, a `DetailReportBand` or a container control
+was invisible to the counter. A real production report — `rptWorkerLedger_DJ.repx`,
+67 kB out of an SBS.JMS application, keeping most of its content in five sub-bands
+— counted 2 tables and 28 cells against 3 and 47 declared, printed CONTENT LOST
+and exited non-zero. It also found 19 of its 38 expression bindings.
+
+Nothing was lost. **The measurement that settled it was the re-save this command
+already performs**: loading that file and writing it back gives all 47 cells, all 3
+tables and all 30 labels, so the file was intact and the counter was blind. Repeat
+that comparison if this is ever doubted again.
+
+A false positive here is worse than a missing feature, because of what this tool is
+for: it is what the project trusts when the documentation and the file disagree. A
+false CONTENT LOST sends someone hunting duplicate `Ref` values that do not exist,
+in a report that is fine, using the tool that exists to end exactly that kind of
+guessing. Sub-bands are ordinary in reports built by hand in the designer, so any
+real file is liable to trip it — which is the argument for pointing this at real
+reports rather than only at generated ones.
+
 **Point it at a real generation.** Export a `.repx` from the app and inspect it:
 that is the cheapest way to find out whether the model's own output has the
 `Ref` collisions `src/lib/repxRefs.ts` was written to repair, which is still
@@ -104,6 +125,15 @@ Add whatever feature you need to `Emit()` in `Program.cs`, build, run, and read
 the XML it prints. The current program covers an expression binding, a binding
 with a `TextFormatString`, and a summary, because those were the open questions
 on 2026-09-04.
+
+**Run the tool with no arguments for the full list** — there are twenty-one
+commands, not the three named above. Every measurement written up below came from
+one of them, and they are all still there: `emit-chart`, `emit-gauge`,
+`emit-styles`, `emit-rules`, `emit-comb`, `emit-container`, `emit-cols`,
+`emit-book`, `emit-toc`, `emit-grow` and the rest. The usage text listed four of
+the twenty-one until 2026-09-23, so a command that had been working for weeks read
+as one nobody had written yet, and its results sat in this file with no way back
+to the thing that produced them.
 
 ## What it has already settled
 

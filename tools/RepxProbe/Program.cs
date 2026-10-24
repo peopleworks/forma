@@ -23,11 +23,42 @@ using DevExpress.XtraReports.Parameters;
 
 static class Program {
     static int Main(string[] args) {
-        if (args.Length < 2) {
-            Console.WriteLine("usage: RepxProbe emit <out.repx>");
-            Console.WriteLine("       RepxProbe emit-group <out.repx>");
-            Console.WriteLine("       RepxProbe emit-params <out.repx>");
-            Console.WriteLine("       RepxProbe inspect <in.repx>");
+        // render-cols is the one command that takes no file, so it is let through
+        // with a single argument. It used to need a dummy second one, because this
+        // guard ran before the switch for every command alike.
+        bool takesNoFile = args.Length == 1 && args[0] == "render-cols";
+        if (args.Length < 2 && !takesNoFile) {
+            // Every case in the switch below, because a command missing from here
+            // is a command nobody finds. This listed four of twenty-one until
+            // 2026-09-23, so emit-chart and emit-gauge read as unwritten when both
+            // had been working for weeks -- the measurements they produced are in
+            // this tool's README while the commands that produced them were not
+            // discoverable from the tool itself.
+            Console.WriteLine("usage: RepxProbe <command> <file.repx>");
+            Console.WriteLine();
+            Console.WriteLine("  inspect        what the LOADER sees in a file (exit 1 if content was lost)");
+            Console.WriteLine();
+            Console.WriteLine("  what the SERIALIZER writes for a feature:");
+            Console.WriteLine("    emit           expression binding, TextFormatString, summary");
+            Console.WriteLine("    emit-group     group bands, GroupFields, group subtotal");
+            Console.WriteLine("    emit-params    parameters and the ObjectStorage block");
+            Console.WriteLine("    emit-chart     XRChart series and diagram");
+            Console.WriteLine("    emit-gauge     XRGauge");
+            Console.WriteLine("    emit-comb      checkbox and comb");
+            Console.WriteLine("    emit-container panel, subreport, shapes");
+            Console.WriteLine("    emit-styles    StyleSheet and StyleName");
+            Console.WriteLine("    emit-rules     FormattingRuleSheet");
+            Console.WriteLine("    emit-calc      calculated fields");
+            Console.WriteLine("    emit-sort      sort order");
+            Console.WriteLine("    emit-cols      multi-column layout");
+            Console.WriteLine("    emit-book      bookmarks");
+            Console.WriteLine("    emit-toc       table of contents");
+            Console.WriteLine("    emit-mark      watermark");
+            Console.WriteLine("    emit-marks     crossband controls");
+            Console.WriteLine("    emit-grow      CanGrow / WordWrap defaults");
+            Console.WriteLine("    emit-rich      XRRichText");
+            Console.WriteLine("    emit-pdf       render to PDF bricks");
+            Console.WriteLine("    render-cols    column render check (no file argument)");
             return 2;
         }
         try {
@@ -1559,6 +1590,58 @@ static class Program {
 
     // ------------------------------------------------------------- inspect
 
+    /// <summary>
+    /// Every band in the report, including sub-bands and the bands of a detail
+    /// report, flattened.
+    ///
+    /// This exists because of a FALSE POSITIVE, which is the worst thing a check
+    /// like this can produce. Inspect used to walk `r.Bands` and each band's own
+    /// `Controls` and stop there. A real production report --
+    /// rptWorkerLedger_DJ.repx, 67 kB out of an SBS.JMS application -- keeps most
+    /// of its content in five SubBands, so the walk saw 2 tables and 28 cells
+    /// where the file declares 3 and 47, and Inspect reported CONTENT LOST and
+    /// exited non-zero.
+    ///
+    /// Nothing was lost. Loading that file and re-saving it gives back all 47
+    /// cells, all 3 tables and all 30 labels -- which is the measurement that
+    /// settled it, and the one to repeat if this is ever doubted. The blind spot
+    /// was here, in the counter.
+    ///
+    /// That matters more than an ordinary bug because of what this tool is FOR:
+    /// it is the thing the project trusts when the documentation and the file
+    /// disagree. A false CONTENT LOST sends someone hunting duplicate Ref values
+    /// that do not exist, in a report that is fine, with the tool that exists to
+    /// stop exactly that kind of guessing. Sub-bands are ordinary in reports
+    /// written by hand in the designer, so any real file is liable to trip it.
+    /// </summary>
+    static void CollectBands(Band band, List<Band> into) {
+        into.Add(band);
+        foreach (Band sub in band.SubBands) CollectBands(sub, into);
+        DetailReportBand detailReport = band as DetailReportBand;
+        if (detailReport != null)
+            foreach (Band nested in detailReport.Bands) CollectBands(nested, into);
+    }
+
+    /// <summary>
+    /// Every control under a collection, including the ones nested inside a
+    /// container. An XRTable inside an XRPanel is as invisible to a one-level
+    /// walk as one inside a SubBand, and for the same reason.
+    ///
+    /// A Band is skipped, because CollectBands has already reached it. A
+    /// DetailReportBand keeps its child bands in its own Controls collection, so
+    /// without the skip every table in a detail report was counted twice --
+    /// measured on 2026-10-24 as 2 tables and 2 cells from a file whose re-save
+    /// holds 1 of each. Over-counting is the dangerous direction for this tool:
+    /// it can hide a real loss as "nothing lost".
+    /// </summary>
+    static void CollectControls(XRControlCollection controls, List<XRControl> into) {
+        foreach (XRControl c in controls) {
+            if (c is Band) continue;
+            into.Add(c);
+            CollectControls(c.Controls, into);
+        }
+    }
+
     /// Loads a file and reports what DevExpress actually sees in it.
     ///
     /// The headline is the cell comparison. Elements are counted in the raw
@@ -1590,8 +1673,12 @@ static class Program {
 
         int cells = 0, bindings = 0, tables = 0;
         var lines = new List<string>();
-        foreach (Band b in r.Bands)
-            foreach (XRControl c in b.Controls)
+        var bands = new List<Band>();
+        foreach (Band top in r.Bands) CollectBands(top, bands);
+        foreach (Band b in bands) {
+            var controls = new List<XRControl>();
+            CollectControls(b.Controls, controls);
+            foreach (XRControl c in controls)
                 if (c is XRTable) {
                     tables++;
                     foreach (XRTableRow row in ((XRTable)c).Rows)
@@ -1605,6 +1692,7 @@ static class Program {
                                              ? "" : "   format " + cell.TextFormatString));
                         }
                 }
+        }
 
         Console.WriteLine("loaded   : " + tables + " tables, " + cells + " cells, "
                           + bindings + " bindings");
