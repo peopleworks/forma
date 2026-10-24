@@ -34,6 +34,15 @@
 # below is `temurin`. Neither affects this file. Majors are pinned rather than
 # floated: a moving tag means a green run today and a red one tomorrow for a
 # reason found in no commit here.
+#
+# ON THE RUNNER IMAGE
+#
+# The same reasoning, applied to the operating system. Both jobs ran on
+# `ubuntu-latest` until 2026-10-24, when the runs carried a notice that the
+# label migrates to Ubuntu 26 from 2026-10-19. The last run before this pin,
+# 40111819227, still reported `Image: ubuntu-24.04` in both jobs' setup logs,
+# so pinning that label keeps CI on the image it is known to pass on. Moving to a newer image is still worth doing,
+# but as a commit that changes this line, so a failure points at a cause.
 
 name: checks
 
@@ -46,7 +55,7 @@ on:
 jobs:
   checks:
     name: lint, types, encoding, tests, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -105,7 +114,7 @@ jobs:
 
   rules:
     name: firestore rules
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
