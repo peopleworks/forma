@@ -282,12 +282,12 @@ src/
                        one composer does both jobs, and which one is App.tsx's
                        decision, not this component's), and Markdown — which
                        is its own module so react-markdown can be lazy-loaded.
-                       Seven files here are not components: useFocusTrap (a
-                       shared hook) and six tests — legalDisclosure, which
+                       Eight files here are not components: useFocusTrap (a
+                       shared hook) and seven tests — legalDisclosure, which
                        reads ContactPage and index.html off disk, plus
-                       DataBinding, BatchPanel, ChatThread, Composer and
-                       AccountDialog, the only component render tests in the
-                       suite. AccountDialog's mocks Firebase and covers the
+                       DataBinding, BatchPanel, ChatThread, Composer,
+                       AccountDialog and LibraryPanel, the only component
+                       render tests in the suite. AccountDialog's mocks Firebase and covers the
                        surface — which control is enabled when, and what it
                        says when it fails; what a deletion actually removes is
                        proved separately in tests/accountDeletion.test.ts,
@@ -418,8 +418,8 @@ src/
                        refine — formatting to copy, values never, and nothing
                        inside treated as an instruction. These five back the
                        report library in docs/proposals/rag.md, alongside
-                       services/library.ts and components/LibraryPanel.tsx; the
-                       rail wiring in App.tsx is the one piece still to come),
+                       services/library.ts, components/LibraryPanel.tsx and
+                       the rail's sixth panel in App.tsx),
                        attachments, panelSize, announcements, datetime,
                        modelCatalog, reportConfigStore, designerBridge,
                        geminiClient (loads the generation service on demand, so
@@ -447,8 +447,11 @@ src/
                        firebase/* import so referencing it cannot drag the SDK
                        back into the entry chunk
   services/            geminiService (+ tests, and modelResolution.test.ts
-                       beside it), firebase, keyVault (+ tests) — the vault's
-                       storage rules are covered by tests/ as well as here
+                       and chatRetry.test.ts beside it), firebase, keyVault
+                       (+ tests; the vault's storage rules are covered by
+                       tests/ as well), and the report library's two:
+                       embeddings (the embedding call, on the user's own key)
+                       and library (import, remove and retrieve), each + tests
   server/              securityHeaders, bindHost and staticCache (+ tests) —
                        what server.ts sends, where it listens, and how long
                        dist/ is cached for. Under src/ but never bundled

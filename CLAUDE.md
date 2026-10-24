@@ -49,7 +49,7 @@ Most of the reasoning behind this codebase is **not in this file**. It lives in 
 | the REPX audit, a finding `code`, the status-bar error/warning count, `src/lib/repxAudit.ts` | **That file's own doc comment for why a check exists**, [`gemini.md`](docs/notes/gemini.md) for how each was measured against DevExpress, and [`app-shell.md`](docs/notes/app-shell.md) — *The REPX audit is a count in the status bar* — for where it runs and what the user sees. It asks what is still wrong *after* the repairs, so an error means a repair declined; it gates nothing, and that is deliberate |
 | the batch queue, the `.zip`, `src/lib/batchQueue.ts`, `src/lib/zip.ts` | [`app-shell.md`](docs/notes/app-shell.md) — *Batch is a rail panel*. One file at a time is a quota decision, not a performance oversight |
 | the Revisions panel, `src/lib/revisions.ts` | [`app-shell.md`](docs/notes/app-shell.md) — *Revisions is the fifth rail panel* for the panel and why a drag is not a revision; [`persistence.md`](docs/notes/persistence.md) for storage, and read that one before touching deletion |
-| the report library, embeddings, `src/lib/repxChunks.ts`, `embedStore.ts`, `vectorSearch.ts`, `libraryDb.ts`, `houseStyle.ts`, `src/services/library.ts`, `embeddings.ts`, `LibraryPanel.tsx` | [`docs/proposals/rag.md`](docs/proposals/rag.md), the design and its build log. It is a proposal rather than a note until it ships, so a grep of `docs/notes/` finds nothing for it. Two decisions to keep: *Retrieval belongs on the refine pass, not the first pass*, and *Strip the data on the way in*. An example the model is shown is formatting to copy, with every value replaced, because a model copies values it sees and a kept `Ref` makes the loader discard content |
+| the report library, embeddings, `src/lib/repxChunks.ts`, `embedStore.ts`, `vectorSearch.ts`, `libraryDb.ts`, `houseStyle.ts`, `src/services/library.ts`, `embeddings.ts`, `LibraryPanel.tsx` | [`docs/proposals/rag.md`](docs/proposals/rag.md), the design and its build log. The code is built and wired, but it stays a proposal until the evaluation in *How we would know it worked* has been run, so a grep of `docs/notes/` finds nothing for it. Two decisions to keep: *Retrieval belongs on the refine pass, not the first pass*, and *Strip the data on the way in*. An example the model is shown is formatting to copy, with every value replaced, because a model copies values it sees and a kept `Ref` makes the loader discard content |
 | the workspace shell, any `wb-` class, `src/workspace.css` | [`app-shell.md`](docs/notes/app-shell.md) (the 2026-08-12 port) + [`styling.md`](docs/notes/styling.md) (the artifact token aliases) |
 | dragging or collapsing the review column, `src/lib/panelSize.ts` | [`app-shell.md`](docs/notes/app-shell.md) — *The review column is resizable and collapsible*, the first deliberate departure from the port |
 | a route, a deep link, `document.title` | [`app-shell.md`](docs/notes/app-shell.md) — *Routing is real paths* |
@@ -196,8 +196,8 @@ broken, and nothing in the toolchain enforces any of them.
   arithmetic — this bullet used to state it as a before-and-after pair of suite totals,
   which was stale within days of being written.
 - **File naming: `PascalCase.tsx` for React components, `camelCase.ts` for everything
-  else.** 100% consistent today — **27** PascalCase components and **115** `.ts` files
-  (that is `git ls-files src`, tests included; **repo-wide the answer is 122**, because
+  else.** 100% consistent today — **28** PascalCase components and **129** `.ts` files
+  (that is `git ls-files src`, tests included; **repo-wide the answer is 136**, because
   `server.ts` and the four root configs are also `.ts`. State the scope whenever you
   quote this number — an unqualified "67" is the next thing someone will "correct" to
   73.) The single exception is `src/vite-env.d.ts`, which is Vite's own required name.
@@ -212,14 +212,15 @@ broken, and nothing in the toolchain enforces any of them.
   single commit moves one of them, and the gap is never visible by reading. They are
   cheap to re-measure and the commands are given; re-measure rather than trust them.
   **Three traps, each of which has been written in here as fact at least once.**
-  **(1) Do not "correct" the 27 to 35 by counting `.tsx` files.** There are 35, and the
-  eight that are not components are deliberate: `main.tsx` is the entry point, `icons.tsx`
+  **(1) Do not "correct" the 28 to 37 by counting `.tsx` files.** There are 37, and the
+  nine that are not components are deliberate: `main.tsx` is the entry point, `icons.tsx`
   and `sections.tsx` export collections rather than one component, and
   `DataBinding.test.tsx`, `BatchPanel.test.tsx`, `ChatThread.test.tsx`,
-  `Composer.test.tsx` and `AccountDialog.test.tsx` are colocated component tests, named
+  `Composer.test.tsx`, `AccountDialog.test.tsx` and `LibraryPanel.test.tsx` are
+  colocated component tests, named
   after the component they test exactly as `repx.test.ts` is named after `repx.ts`. Do
   not count them as components and do not rename them.
-  **(2)** `git ls-files 'src/**/*.tsx'` answers **33**, because that pathspec does not
+  **(2)** `git ls-files 'src/**/*.tsx'` answers **35**, because that pathspec does not
   match files sitting directly in `src/` and so drops `App.tsx` and `main.tsx`.
   **(3)** Count with `git ls-files | Where-Object { $_ -like '*.tsx' }` and *read the
   names*, rather than trusting whichever of the three numbers you got.
@@ -247,10 +248,11 @@ broken, and nothing in the toolchain enforces any of them.
 - **`docs/` holds all the prose, in four kinds — plus `media/`, which is not prose.**
   `PRD.md` and `notes/` are *current* and maintained against the code.
   `design/DESIGN.md` is the design source of truth.
-  **`docs/proposals/`** holds designs that are not shipped yet, currently `rag.md` (the
-  report library). They sit outside `notes/` on purpose. A session greps the notes for
-  what is true now, and a note describing unbuilt code would be a pointer that resolves to
-  nothing. When a proposal ships, its reasoning moves into `notes/` and the proposal goes.
+  **`docs/proposals/`** holds designs that have not graduated into `notes/`, currently
+  `rag.md` (the report library, built and wired but not yet evaluated). They sit outside
+  `notes/` on purpose: a session greps the notes for what is true now, and a proposal
+  records what was planned and is still being proven. When one proves out, its reasoning
+  moves into `notes/` and the proposal goes.
   **`docs/media/`** (2026-09-01) holds images the committed documentation links to, and is
   the *only* place a screenshot may be committed — `CONTRIBUTING.md` bans them everywhere
   else, and that ban was absolute until the README needed one. Nothing in the build reads

@@ -1,6 +1,10 @@
 # Retrieval over the user's own report library
 
-**Status: proposal. Nothing described here is built.** Written 2026-09-23.
+**Status: built and wired, not yet evaluated.** Written 2026-09-23 as a proposal, and
+every milestone in *Build order* was built by 2026-09-24. The comparison under *How we
+would know it worked* has not been run, so whether retrieval brings a refine closer to
+house style is still unmeasured — and that result, not the code existing, is what
+decides the move into `../notes/` described below.
 
 This file is in `docs/proposals/` rather than `docs/notes/` deliberately. The five
 notes are current and maintained against the code, so a session greps them for what
